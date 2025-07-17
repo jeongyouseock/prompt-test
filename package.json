@@ -1,0 +1,54 @@
+{
+    "name": "ai-prompt-writer",
+    "displayName": "AI Prompt Writer",
+    "description": "An extension to chat with an AI and save the prompts.",
+    "version": "0.0.1",
+    "engines": {
+      "vscode": "^1.85.0"
+    },
+    "categories": [
+      "Other"
+    ],
+    "activationEvents": [
+      "onCommand:ai-prompt-writer.start"
+    ],
+    "main": "./extension.js",
+    "contributes": {
+      "commands": [
+        {
+          "command": "ai-prompt-writer.start",
+          "title": "Start AI Prompt Writer"
+        }
+      ],
+      "configuration": {
+        "title": "AI Prompt Writer",
+        "properties": {
+          "ai-prompt-writer.apiKey": {
+            "type": "string",
+            "default": "",
+            "description": "API key for the Anthropic (Claude) API.",
+            "scope": "application"
+          }
+        }
+      }
+    },
+    "scripts": {
+      "lint": "eslint .",
+      "pretest": "npm run lint",
+      "test": "node ./test/runTest.js"
+    },
+    "devDependencies": {
+      "@types/vscode": "^1.85.0",
+      "@types/glob": "^8.1.0",
+      "@types/mocha": "^10.0.6",
+      "@types/node": "18.x",
+      "eslint": "^8.56.0",
+      "glob": "^8.1.0",
+      "mocha": "^10.2.0",
+      "typescript": "^5.3.3",
+      "@vscode/test-electron": "^2.3.8"
+    },
+    "dependencies": {
+      "@anthropic-ai/sdk": "^0.20.1"
+    }
+  }
