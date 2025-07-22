@@ -64,73 +64,69 @@ function activate(context) {
         const anthropic = new Anthropic({ apiKey });
         conversationHistory = []; // Start a new conversation
 
+        // 웹뷰 로드 시 첫 환영 메시지 전송
+        setTimeout(() => {
+            panel.webview.postMessage({
+                command: 'addResponse',
+                text: '🤖 AI 프롬프트 작성 도우미 AI(WatchCode) 입니다. 🤖'
+            });
+        }, 1000);
+
         panel.webview.onDidReceiveMessage(
             async message => {
                 switch (message.command) {
                     case 'sendMessage':
-                        const userMessage = message.text;
-                        conversationHistory.push({ role: 'user', content: userMessage });
-
-                        if (userMessage.toLowerCase() === '저장해줘!') {
-                            saveConversation(panel.webview);
-                            return;
-                        }
-
                         try {
-                            if (activeSystemPrompt && activeSystemPrompt.includes('<case1>') && activeSystemPrompt.includes('<case2>')) {
-                                const case1Content = activeSystemPrompt.split('<case1>')[1].split('</case1>')[0];
-                                const case2Content = activeSystemPrompt.split('<case2>')[1].split('</case2>')[0];
+                            const { text, section, prompts } = message;
 
-                                const systemPrompt1 = case1Content.split('<explain>')[1].split('</explain>')[0].trim();
-                                const systemPrompt2 = case2Content.split('<explain>')[1].split('</explain>')[0].trim();
+                            // AI에게 보낼 메시지 구성
+                            const userMessageForAPI = {
+                                userMsg: text,
+                                changeTarget: section, // 사용자가 선택한 섹션 ID 추가
+                                prompt: prompts
+                            };
 
-                                const tempHistory = [...conversationHistory];
+                            // 대화 기록에 사용자 메시지 추가 (단순 텍스트로)
+                            conversationHistory.push({ role: 'user', content: text });
 
-                                const [response1, response2] = await Promise.all([
-                                    anthropic.messages.create({
-                                        model: "claude-3-opus-20240229",
-                                        max_tokens: 1024,
-                                        system: systemPrompt1,
-                                        messages: tempHistory.filter(m => m.role !== 'assistant' || m.content !== '저장되었습니다.')
-                                    }),
-                                    anthropic.messages.create({
-                                        model: "claude-3-opus-20240229",
-                                        max_tokens: 1024,
-                                        system: systemPrompt2,
-                                        messages: tempHistory.filter(m => m.role !== 'assistant' || m.content !== '저장되었습니다.')
-                                    })
-                                ]);
+                            const apiParams = {
+                                model: "claude-3-opus-20240229",
+                                max_tokens: 2048, // JSON 응답이 길 수 있으므로 토큰 수 증가
+                                system: activeSystemPrompt,
+                                messages: [
+                                    ...conversationHistory.filter(m => m.role !== 'assistant' || !m.content.startsWith('{')),
+                                    { role: 'user', content: JSON.stringify(userMessageForAPI) }
+                                ]
+                            };
 
-                                const aiResponse = `### 🍀 긍정적 사고 (원영적 사고)\n${response1.content[0].text}\n\n---\n\n### 😶‍🌫️ 현실적 사고 (정민적 사고)\n${response2.content[0].text}`;
+                            console.log('--- API Request ---');
+                            console.log(JSON.stringify(apiParams, null, 2));
 
-                                conversationHistory.push({ role: 'assistant', content: aiResponse });
+                            const msg = await anthropic.messages.create(apiParams);
+                            const aiResponseRaw = msg.content[0].text;
 
-                                panel.webview.postMessage({
-                                    command: 'addResponse',
-                                    text: aiResponse
-                                });
+                            console.log('--- API Response ---');
+                            console.log(aiResponseRaw);
 
-                            } else {
-                                const msg = await anthropic.messages.create({
-                                    model: "claude-3-opus-20240229",
-                                    max_tokens: 1024,
-                                    system: activeSystemPrompt,
-                                    messages: conversationHistory.filter(m => m.role !== 'assistant' || m.content !== '저장되었습니다.')
-                                });
-    
-                                const aiResponse = msg.content[0].text;
-                                conversationHistory.push({ role: 'assistant', content: aiResponse });
-    
-                                panel.webview.postMessage({
-                                    command: 'addResponse',
-                                    text: aiResponse
-                                });
-                            }
+                            // AI 응답을 JSON으로 파싱
+                            const aiResponseJson = JSON.parse(aiResponseRaw);
+
+                            // 대화 기록에 AI 응답 추가 (JSON 문자열로)
+                            conversationHistory.push({ role: 'assistant', content: aiResponseRaw });
+
+                            // 웹뷰로 프롬프트 업데이트 명령 전송
+                            panel.webview.postMessage({
+                                command: 'updatePrompts',
+                                response: aiResponseJson.response, // AI의 채팅 메시지
+                                prompts: aiResponseJson.prompt // 업데이트된 프롬프트 데이터
+                            });
+
                         } catch (error) {
-                            vscode.window.showErrorMessage('Error calling Anthropic API: ' + error.message);
+                            console.error('Error processing message:', error);
+                            vscode.window.showErrorMessage('Error processing message: ' + error.message);
                             panel.webview.postMessage({
                                 command: 'addResponse',
-                                text: 'Error calling Anthropic API: ' + error.message
+                                text: '오류가 발생했습니다: ' + error.message
                             });
                         }
                         return;
