@@ -121,6 +121,17 @@ function activate(context) {
                                 prompts: aiResponseJson.prompt // 업데이트된 프롬프트 데이터
                             });
 
+                            // 현재 작업 폴더에 'saved-prompt.md' 파일을 즉시 저장
+                            const workspaceFolders = vscode.workspace.workspaceFolders;
+                            if (workspaceFolders) {
+                                const folderPath = workspaceFolders[0].uri.fsPath;
+                                const filePath = path.join(folderPath, 'saved-prompt.md');
+                                fs.writeFileSync(filePath, aiResponseJson.prompt);
+                                vscode.window.showInformationMessage(`파일이 ${filePath}에 저장되었습니다.`);
+                            } else {
+                                vscode.window.showErrorMessage('작업 폴더가 열려있지 않아 파일을 저장할 수 없습니다.');
+                            }
+
                         } catch (error) {
                             console.error('Error processing message:', error);
                             vscode.window.showErrorMessage('Error processing message: ' + error.message);
@@ -128,6 +139,64 @@ function activate(context) {
                                 command: 'addResponse',
                                 text: '오류가 발생했습니다: ' + error.message
                             });
+                        }
+                        return;
+
+                    case 'saveFile':
+                        try {
+                            let { content, taskType } = message;
+                            const dashboardPath = path.join(context.extensionPath, 'embedding', 'dashboard.txt');
+                            const dashboardContent = fs.readFileSync(dashboardPath, 'utf-8');
+                            
+                            // '작업 유형' 섹션 추가
+                            if (taskType) {
+                                content += `\n# 작업 유형\n\n${taskType}\n`;
+                            }
+
+                            // 마크다운 내용 끝에 '출력 형식' 섹션 추가
+                            content += `\n# 출력 형식 (Output Format)\n\n${dashboardContent}\n`;
+
+                            const workspaceFolders = vscode.workspace.workspaceFolders;
+                            if (workspaceFolders) {
+                                const folderPath = workspaceFolders[0].uri.fsPath;
+                                const filePath = path.join(folderPath, 'saved-prompt.md');
+                                fs.writeFileSync(filePath, content, 'utf8');
+                                vscode.window.showInformationMessage(`파일이 저장되었습니다: ${filePath}`);
+                            } else {
+                                vscode.window.showErrorMessage('작업 폴더가 열려있지 않아 파일을 저장할 수 없습니다.');
+                            }
+                        } catch (error) {
+                            console.error('파일 저장 중 오류 발생:', error);
+                            vscode.window.showErrorMessage('파일 저장에 실패했습니다: ' + error.message);
+                        }
+                        return;
+
+                    case 'saveFileImmediately':
+                        try {
+                            let { content, taskType } = message;
+                            const dashboardPath = path.join(context.extensionPath, 'embedding', 'dashboard.txt');
+                            const dashboardContent = fs.readFileSync(dashboardPath, 'utf-8');
+
+                            // '작업 유형' 섹션 추가
+                            if (taskType) {
+                                content += `\n# 작업 유형\n\n${taskType}\n`;
+                            }
+
+                            // 마크다운 내용 끝에 '출력 형식' 섹션 추가
+                            content += `\n# 출력 형식 (Output Format)\n\n${dashboardContent}\n`;
+
+                            const workspaceFolders = vscode.workspace.workspaceFolders;
+                            if (workspaceFolders) {
+                                const folderPath = workspaceFolders[0].uri.fsPath;
+                                const filePath = path.join(folderPath, 'saved-prompt.md');
+                                fs.writeFileSync(filePath, content, 'utf8');
+                                vscode.window.showInformationMessage(`파일이 저장되었습니다: ${filePath}`);
+                            } else {
+                                vscode.window.showErrorMessage('작업 폴더가 열려있지 않아 파일을 저장할 수 없습니다.');
+                            }
+                        } catch (error) {
+                            console.error('파일 저장 중 오류 발생:', error);
+                            vscode.window.showErrorMessage('파일 저장에 실패했습니다: ' + error.message);
                         }
                         return;
                 }
@@ -138,26 +207,6 @@ function activate(context) {
     });
 
     context.subscriptions.push(startDisposable);
-}
-
-function saveConversation(webview) {
-    if (vscode.workspace.workspaceFolders) {
-        const folderPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-        let content = '# AI Prompt Log\n\n';
-        conversationHistory.forEach(turn => {
-            content += `## ${turn.role === 'user' ? 'User' : 'AI'}\n\n${turn.content}\n\n`;
-        });
-        const filePath = path.join(folderPath, 'prompt-log.md');
-        try {
-            fs.writeFileSync(filePath, content);
-            webview.postMessage({ command: 'addResponse', text: '저장되었습니다.' });
-            conversationHistory.push({ role: 'assistant', content: '저장되었습니다.' });
-        } catch (error) {
-            vscode.window.showErrorMessage('Failed to save conversation: ' + error.message);
-        }
-    } else {
-        vscode.window.showErrorMessage('No workspace open. Cannot save conversation.');
-    }
 }
 
 function getWebviewContent(context, webview) {

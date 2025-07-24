@@ -4,6 +4,7 @@
     const messages = document.getElementById('messages');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
+    const saveButton = document.getElementById('save-button'); // 추가
 
     const promptSections = document.querySelectorAll('.prompt-section');
     let activeSectionId = null;
@@ -37,6 +38,25 @@
         if (event.key === 'Enter') {
             sendMessage();
         }
+    });
+
+    saveButton.addEventListener('click', () => {
+        let markdownContent = '';
+        promptSections.forEach(section => {
+            const label = section.querySelector('label').textContent;
+            const textarea = section.querySelector('textarea');
+            const value = textarea.value;
+
+            markdownContent += `# ${label}\n\n${value}\n\n`;
+        });
+
+        const taskType = document.getElementById('food-select').value;
+
+        vscode.postMessage({
+            command: 'saveFile',
+            content: markdownContent,
+            taskType: taskType
+        });
     });
 
     function sendMessage() {
